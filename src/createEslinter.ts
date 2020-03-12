@@ -10,18 +10,22 @@ export function createEslinter(eslintOptions: EslintOptions) {
   // See https://eslint.org/docs/developer-guide/nodejs-api#cliengine
   const eslinter = new CLIEngine(eslintOptions);
 
-  function getReport(filepath: string): LintReport | undefined {
+  function getReport(filepaths: string[]): LintReport | undefined {
     try {
-      if (
-        eslinter.isPathIgnored(filepath) ||
-        path.extname(filepath).localeCompare('.json', undefined, {
-          sensitivity: 'accent'
-        }) === 0
-      ) {
+      const lintableFilepaths = filepaths.filter(filepath => {
+        return (
+          !eslinter.isPathIgnored(filepath) &&
+          path.extname(filepath).localeCompare('.json', undefined, {
+            sensitivity: 'accent'
+          }) !== 0
+        );
+      });
+
+      if (!lintableFilepaths.length) {
         return undefined;
       }
 
-      const lintReport = eslinter.executeOnFiles([filepath]);
+      const lintReport = eslinter.executeOnFiles(lintableFilepaths);
 
       if (eslintOptions && eslintOptions.fix) {
         eslinter.outputFixes(lintReport);
@@ -29,7 +33,7 @@ export function createEslinter(eslintOptions: EslintOptions) {
 
       return lintReport;
     } catch (e) {
-      throwIfIsInvalidSourceFileError(filepath, e);
+      filepaths.some(filepath => throwIfIsInvalidSourceFileError(filepath, e));
     }
     return undefined;
   }

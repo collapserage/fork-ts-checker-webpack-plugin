@@ -10,7 +10,9 @@ import {
   createIssuesFromTsDiagnostics,
   createIssuesFromEsLintReports
 } from './issue';
-import { LintReport } from './types/eslint';
+import { LintReport, LintResult } from './types/eslint';
+
+type GroupedResult = [string, LintResult];
 
 export class ApiIncrementalChecker implements IncrementalCheckerInterface {
   protected readonly tsIncrementalCompiler: CompilerHost;
@@ -79,18 +81,29 @@ export class ApiIncrementalChecker implements IncrementalCheckerInterface {
       this.currentEsLintErrors.delete(removedFile);
     }
 
-    for (const updatedFile of this.lastUpdatedFiles) {
-      cancellationToken.throwIfCancellationRequested();
-      if (this.isFileExcluded(updatedFile)) {
-        continue;
-      }
+    const lintableFiles = this.lastUpdatedFiles.filter(
+      file => !this.isFileExcluded(file)
+    );
 
-      const report = this.eslinter.getReport(updatedFile);
+    const report = this.eslinter.getReport(lintableFiles);
 
-      if (report !== undefined) {
-        this.currentEsLintErrors.set(updatedFile, report);
-      } else if (this.currentEsLintErrors.has(updatedFile)) {
-        this.currentEsLintErrors.delete(updatedFile);
+    cancellationToken.throwIfCancellationRequested();
+
+    if (report) {
+      const results: GroupedResult[] = report.results.map(reportEntry => [
+        reportEntry.filePath,
+        reportEntry
+      ]);
+
+      for (const [filePath, result] of results) {
+        if (result.messages.length) {
+          this.currentEsLintErrors.set(filePath, {
+            ...report,
+            results: [result]
+          });
+        } else if (this.currentEsLintErrors.has(filePath)) {
+          this.currentEsLintErrors.delete(filePath);
+        }
       }
     }
 

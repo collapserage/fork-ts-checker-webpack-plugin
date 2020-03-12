@@ -266,7 +266,7 @@ export class IncrementalChecker implements IncrementalCheckerInterface {
       cancellationToken.throwIfCancellationRequested();
 
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const report = this.eslinter!.getReport(fileName);
+      const report = this.eslinter!.getReport([fileName]);
       if (report !== undefined) {
         currentEsLintErrors.set(fileName, report);
       }
